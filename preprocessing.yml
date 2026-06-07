@@ -1,0 +1,85 @@
+name: Automated Preprocessing - Heart Disease
+
+on:
+  # Trigger manual dari GitHub Actions tab
+  workflow_dispatch:
+
+  # Trigger otomatis setiap push ke branch main
+  push:
+    branches:
+      - main
+    paths:
+      - 'heart_raw.csv'
+      - 'preprocessing/automate_Yusfitasari.py'
+
+  # Trigger terjadwal setiap hari Senin jam 07:00 WIB (00:00 UTC)
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+  preprocessing:
+    name: Run Data Preprocessing
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # 3. Install dependencies
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn
+
+      # 4. Cek apakah file raw ada
+      - name: Check Raw Dataset
+        run: |
+          echo "Checking dataset file..."
+          if [ -f "heart_raw.csv" ]; then
+            echo "✅ heart_raw.csv found!"
+            wc -l heart_raw.csv
+          else
+            echo "❌ heart_raw.csv not found!"
+            exit 1
+          fi
+
+      # 5. Jalankan script preprocessing
+      - name: Run Preprocessing Script
+        run: |
+          echo "Starting preprocessing pipeline..."
+          python preprocessing/automate_Yusfitasari.py \
+            --input heart_raw.csv \
+            --output preprocessing/heart_preprocessing
+
+      # 6. Verifikasi output
+      - name: Verify Output Files
+        run: |
+          echo "Verifying output files..."
+          ls -lh preprocessing/heart_preprocessing/
+          echo ""
+          echo "=== heart_preprocessed.csv (first 3 rows) ==="
+          head -3 preprocessing/heart_preprocessing/heart_preprocessed.csv
+          echo ""
+          echo "=== Row counts ==="
+          wc -l preprocessing/heart_preprocessing/*.csv
+
+      # 7. Commit dan push hasil preprocessing ke repository
+      - name: Commit Preprocessed Dataset
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add preprocessing/heart_preprocessing/
+          git diff --staged --quiet || git commit -m "chore: update preprocessed dataset [$(date +'%Y-%m-%d %H:%M:%S')]"
+
+      - name: Push Changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
